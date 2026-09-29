@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#f5f7f5" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#111614" media="(prefers-color-scheme: dark)" />
+  <link rel="icon" href="data:," />
+  <title>Translate Pad</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: light dark;
+      --page: #f5f7f5;
+      --surface: #ffffff;
+      --surface-soft: #edf2ef;
+      --ink: #17201c;
+      --muted: #5e6b65;
+      --line: #d6dfda;
+      --accent: #0b7356;
+      --accent-soft: #dff2e9;
+      --accent-ink: #075440;
+      --danger: #a43d32;
+      --shadow: 0 12px 32px rgba(32, 50, 42, 0.08);
+      --radius-shell: 18px;
+      --radius-control: 10px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --page: #111614;
+        --surface: #18201d;
+        --surface-soft: #202b27;
+        --ink: #edf4f0;
+        --muted: #aebbb5;
+        --line: #34423c;
+        --accent: #68c7a4;
+        --accent-soft: #163b2f;
+        --accent-ink: #9fe1c8;
+        --danger: #ff9c91;
+        --shadow: 0 16px 38px rgba(0, 0, 0, 0.24);
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: "IBM Plex Sans", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, textarea { font: inherit; }
+
+    button { -webkit-tap-highlight-color: transparent; }
+
+    main {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: clamp(10px, 2.5vw, 28px);
+    }
+
+    .pad {
+      width: min(100%, 1040px);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-shell);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .toolbar {
+      min-height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 10px 14px 10px 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-soft);
+    }
+
+    .state {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.25;
+    }
+
+    .state-dot {
+      width: 8px;
+      height: 8px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-soft);
+    }
+
+    .state[data-mode="busy"] .state-dot {
+      animation: pulse 1s ease-in-out infinite;
+    }
+
+    .state[data-mode="error"] { color: var(--danger); }
+    .state[data-mode="error"] .state-dot {
+      background: var(--danger);
+      box-shadow: none;
+    }
+
+    @keyframes pulse {
+      50% { opacity: 0.35; }
+    }
+
+    .clear-button,
+    .copy-button {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--ink);
+      border-radius: var(--radius-control);
+      cursor: pointer;
+      font-weight: 500;
+      transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+    }
+
+    .clear-button {
+      min-height: 34px;
+      padding: 6px 11px;
+      font-size: 0.82rem;
+    }
+
+    .clear-button:hover,
+    .copy-button:hover {
+      border-color: var(--accent);
+      color: var(--accent-ink);
+      background: var(--accent-soft);
+    }
+
+    .clear-button:focus-visible,
+    .copy-button:focus-visible,
+    textarea:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--accent) 28%, transparent);
+      outline-offset: 2px;
+    }
+
+    .fields {
+      display: grid;
+      grid-template-columns: 1fr 1px 1fr;
+    }
+
+    .divider { background: var(--line); }
+
+    .language {
+      min-width: 0;
+      padding: clamp(14px, 2.3vw, 24px);
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+
+    .language-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .language-label {
+      margin: 0;
+      font-size: 0.96rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .language-code {
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+    }
+
+    .text-wrap { position: relative; }
+
+    textarea {
+      width: 100%;
+      min-height: clamp(210px, 41vh, 430px);
+      resize: vertical;
+      display: block;
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 10px 42px;
+      background: transparent;
+      color: var(--ink);
+      font-size: clamp(1rem, 1.2vw, 1.08rem);
+      line-height: 1.75;
+      caret-color: var(--accent);
+    }
+
+    textarea::placeholder { color: color-mix(in srgb, var(--muted) 72%, transparent); }
+
+    textarea:focus { background: var(--surface-soft); }
+
+    #arabic {
+      direction: rtl;
+      text-align: right;
+      font-family: "Noto Sans Arabic", sans-serif;
+      line-height: 1.95;
+    }
+
+    .field-foot {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .counter {
+      color: var(--muted);
+      font-size: 0.73rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .copy-button {
+      min-height: 31px;
+      padding: 4px 10px;
+      font-size: 0.76rem;
+      pointer-events: auto;
+    }
+
+    .copy-button:disabled,
+    .clear-button:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+
+    .copy-button:disabled:hover,
+    .clear-button:disabled:hover {
+      border-color: var(--line);
+      color: var(--ink);
+      background: var(--surface);
+    }
+
+    .privacy {
+      margin: 0;
+      padding: 9px 18px 11px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.72rem;
+      line-height: 1.45;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 660px) {
+      main { padding: 8px; place-items: start center; }
+      .pad { border-radius: 14px; box-shadow: none; }
+      .toolbar { padding-left: 14px; }
+      .fields { grid-template-columns: 1fr; }
+      .divider { height: 1px; }
+      .language { padding: 13px 14px; }
+      textarea { min-height: 185px; max-height: 38vh; }
+      .privacy { padding-inline: 14px; }
+    }
+
+    @media (max-width: 390px) {
+      .state { font-size: 0.78rem; }
+      .state-text .wide { display: none; }
+      textarea { min-height: 165px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="pad" aria-label="Arabic and English translator">
+      <div class="toolbar">
+        <div class="state" id="state" data-mode="ready" role="status" aria-live="polite">
+          <span class="state-dot" aria-hidden="true"></span>
+          <span class="state-text" id="stateText">Type in either box<span class="wide"> — translation follows after a short pause</span></span>
+        </div>
+        <button class="clear-button" id="clearButton" type="button" disabled>Clear</button>
+      </div>
+
+      <div class="fields">
+        <section class="language" aria-labelledby="englishLabel">
+          <div class="language-head">
+            <h2 class="language-label" id="englishLabel">English</h2>
+            <span class="language-code" aria-hidden="true">EN</span>
+          </div>
+          <div class="text-wrap">
+            <textarea id="english" lang="en" dir="ltr" maxlength="3000" autocomplete="off" spellcheck="true" aria-describedby="englishCount" placeholder="Type or paste in English…"></textarea>
+            <div class="field-foot">
+              <span class="counter" id="englishCount">0 / 3000</span>
+              <button class="copy-button" id="copyEnglish" type="button" disabled aria-label="Copy English text">Copy</button>
+            </div>
+          </div>
+        </section>
+
+        <div class="divider" aria-hidden="true"></div>
+
+        <section class="language" aria-labelledby="arabicLabel" lang="ar" dir="rtl">
+          <div class="language-head">
+            <h2 class="language-label" id="arabicLabel">العربية</h2>
+            <span class="language-code" aria-hidden="true">AR</span>
+          </div>
+          <div class="text-wrap">
+            <textarea id="arabic" lang="ar" dir="rtl" maxlength="3000" autocomplete="off" spellcheck="true" aria-describedby="arabicCount" placeholder="اكتب أو الصق النص بالعربية…"></textarea>
+            <div class="field-foot" dir="ltr">
+              <span class="counter" id="arabicCount">0 / 3000</span>
+              <button class="copy-button" id="copyArabic" type="button" disabled aria-label="Copy Arabic text">نسخ</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <p class="privacy">Text is sent to Google Translate or, if unavailable, MyMemory to create the translation.</p>
+      <span class="visually-hidden" id="copyStatus" role="status" aria-live="polite"></span>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var english = document.getElementById("english");
+      var arabic = document.getElementById("arabic");
+      var state = document.getElementById("state");
+      var stateText = document.getElementById("stateText");
+      var clearButton = document.getElementById("clearButton");
+      var copyEnglish = document.getElementById("copyEnglish");
+      var copyArabic = document.getElementById("copyArabic");
+      var englishCount = document.getElementById("englishCount");
+      var arabicCount = document.getElementById("arabicCount");
+      var copyStatus = document.getElementById("copyStatus");
+
+      var timer = null;
+      var revision = 0;
+      var activeSide = null;
+      var controller = null;
+
+      function setState(mode, message) {
+        state.dataset.mode = mode;
+        stateText.textContent = message;
+      }
+
+      function updateControls() {
+        englishCount.textContent = english.value.length + " / 3000";
+        arabicCount.textContent = arabic.value.length + " / 3000";
+        copyEnglish.disabled = !english.value.trim();
+        copyArabic.disabled = !arabic.value.trim();
+        clearButton.disabled = !english.value && !arabic.value;
+      }
+
+      function translationFromGoogle(text, source, target, signal) {
+        var url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" +
+          encodeURIComponent(source) + "&tl=" + encodeURIComponent(target) +
+          "&dt=t&q=" + encodeURIComponent(text);
+        return fetch(url, { signal: signal, referrerPolicy: "no-referrer" })
+          .then(function (response) {
+            if (!response.ok) throw new Error("google-unavailable");
+            return response.json();
+          })
+          .then(function (data) {
+            if (!Array.isArray(data) || !Array.isArray(data[0])) throw new Error("google-invalid");
+            var result = data[0].map(function (part) { return part && part[0] ? part[0] : ""; }).join("");
+            if (!result) throw new Error("google-empty");
+            return result;
+          });
+      }
+
+      function translationFromMyMemory(text, source, target, signal) {
+        var url = "https://api.mymemory.translated.net/get?q=" + encodeURIComponent(text) +
+          "&langpair=" + encodeURIComponent(source + "|" + target);
+        return fetch(url, { signal: signal, referrerPolicy: "no-referrer" })
+          .then(function (response) {
+            if (!response.ok) throw new Error("mymemory-unavailable");
+            return response.json();
+          })
+          .then(function (data) {
+            var result = data && data.responseData && data.responseData.translatedText;
+            if (!result || (data.responseStatus && Number(data.responseStatus) >= 400)) {
+              throw new Error("mymemory-invalid");
+            }
+            return result;
+          });
+      }
+
+      function translate(text, source, target, signal) {
+        return translationFromGoogle(text, source, target, signal)
+          .catch(function (error) {
+            if (error && error.name === "AbortError") throw error;
+            return translationFromMyMemory(text, source, target, signal);
+          });
+      }
+
+      function queueTranslation(side) {
+        activeSide = side;
+        revision += 1;
+        var requestRevision = revision;
+
+        if (timer) window.clearTimeout(timer);
+        if (controller) controller.abort();
+
+        var sourceField = side === "english" ? english : arabic;
+        var targetField = side === "english" ? arabic : english;
+        var source = side === "english" ? "en" : "ar";
+        var target = side === "english" ? "ar" : "en";
+        var text = sourceField.value.trim();
+
+        updateControls();
+
+        if (!text) {
+          targetField.value = "";
+          updateControls();
+          setState("ready", "Type in either box — translation follows after a short pause");
+          return;
+        }
+
+        setState("ready", "Waiting for a pause…");
+        timer = window.setTimeout(function () {
+          controller = new AbortController();
+          setState("busy", side === "english" ? "Translating to Arabic…" : "Translating to English…");
+
+          translate(text, source, target, controller.signal)
+            .then(function (result) {
+              if (requestRevision !== revision || activeSide !== side) return;
+              targetField.value = result;
+              updateControls();
+              setState("ready", "Translation ready");
+            })
+            .catch(function (error) {
+              if (error && error.name === "AbortError") return;
+              if (requestRevision !== revision) return;
+              setState("error", "Translation unavailable — check your connection and try again");
+            });
+        }, 550);
+      }
+
+      function copyText(field, button, defaultLabel, copiedLabel) {
+        var text = field.value;
+        if (!text) return;
+
+        function done() {
+          button.textContent = copiedLabel;
+          copyStatus.textContent = copiedLabel;
+          window.setTimeout(function () { button.textContent = defaultLabel; }, 1300);
+        }
+
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(done).catch(function () {
+            fallbackCopy(field, done);
+          });
+        } else {
+          fallbackCopy(field, done);
+        }
+      }
+
+      function fallbackCopy(field, callback) {
+        var start = field.selectionStart;
+        var end = field.selectionEnd;
+        field.focus();
+        field.select();
+        try {
+          if (document.execCommand("copy")) callback();
+        } catch (error) {
+          copyStatus.textContent = "Copy failed — select the text and copy manually";
+        }
+        field.setSelectionRange(start, end);
+      }
+
+      english.addEventListener("input", function () { queueTranslation("english"); });
+      arabic.addEventListener("input", function () { queueTranslation("arabic"); });
+
+      clearButton.addEventListener("click", function () {
+        revision += 1;
+        activeSide = null;
+        if (timer) window.clearTimeout(timer);
+        if (controller) controller.abort();
+        english.value = "";
+        arabic.value = "";
+        updateControls();
+        setState("ready", "Type in either box — translation follows after a short pause");
+        english.focus();
+      });
+
+      copyEnglish.addEventListener("click", function () {
+        copyText(english, copyEnglish, "Copy", "Copied");
+      });
+
+      copyArabic.addEventListener("click", function () {
+        copyText(arabic, copyArabic, "نسخ", "تم النسخ");
+      });
+
+      updateControls();
+    })();
+var prefillQuery = new URLSearchParams(window.location.search);
+var prefillEn = prefillQuery.get("en");
+var prefillAr = prefillQuery.get("ar");
+if (prefillEn) {
+  english.value = prefillEn;
+  queueTranslation("english");
+} else if (prefillAr) {
+  arabic.value = prefillAr;
+  queueTranslation("arabic");
+}
+
+  </script>
+</body>
+</html>
